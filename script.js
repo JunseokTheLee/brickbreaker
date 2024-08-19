@@ -18,12 +18,12 @@ let dy = -7;
 
 // Brick settings
 const brickRowCount = 3;
-const brickColumnCount = 19;
+const brickColumnCount = 20;
 const brickWidth = 75;
 const brickHeight = 40;
 const brickPadding = 10;
 const brickOffsetTop = 30;
-const brickOffsetLeft = 30;
+const brickOffsetLeft = 18;
 
 let bricks = [];
 for (let c = 0; c < brickColumnCount; c++) {
