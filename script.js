@@ -1,7 +1,7 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-canvas.width = 1920-200;
+canvas.width = 1920-600;
 canvas.height = 1080-500;
 
 // Paddle settings
@@ -18,7 +18,7 @@ let dy = -7;
 
 // Brick settings
 const brickRowCount = 3;
-const brickColumnCount = 20;
+const brickColumnCount = 15;
 const brickWidth = 75;
 const brickHeight = 40;
 const brickPadding = 10;
