@@ -1,3 +1,4 @@
+# detect.py
 # Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +33,6 @@ python3 detect.py \
   --model ${TEST_DATA}/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite \
   --labels ${TEST_DATA}/coco_labels.txt
 """
-
 import argparse
 import collections
 import svgwrite
@@ -42,8 +42,6 @@ import numpy as np
 import os
 import re
 import time
-from PIL import Image  # Using Pillow for image resizing
-
 from tracker import ObjectTracker
 
 Object = collections.namedtuple('Object', ['id', 'score', 'bbox'])
@@ -61,22 +59,38 @@ def shadow_text(dwg, x, y, text, font_size=20):
     dwg.add(dwg.text(text, insert=(x, y), fill='white', font_size=font_size))
 
 
-def generate_svg(src_size, inference_size, inference_box, objs, labels, text_lines, trdata, trackerFlag):
-    dwg = svgwrite.Drawing('', size=src_size)
-    src_w, src_h = src_size
+def generate_svg(src_size, inference_size, inference_box, objs, labels, text_lines, trdata, trackerFlag, crop_offsets):
+    # Unpack the crop offsets.
+    crop_left, crop_top, crop_right, crop_bottom = crop_offsets
+    # Compute the size of the visible (cropped) region.
+    cropped_width = src_size[0] - crop_left - crop_right
+    cropped_height = src_size[1] - crop_top - crop_bottom
+    # Use the cropped size for the drawing.
+    dwg = svgwrite.Drawing('', size=(cropped_width, cropped_height))
     inf_w, inf_h = inference_size
     box_x, box_y, box_w, box_h = inference_box
-    scale_x, scale_y = src_w / box_w, src_h / box_h
+    # Scale factors now computed using the cropped dimensions.
+    scale_x, scale_y = cropped_width / box_w, cropped_height / box_h
 
     for y, line in enumerate(text_lines, start=1):
         shadow_text(dwg, 10, y * 20, line)
     if trackerFlag and (np.array(trdata)).size:
         for td in trdata:
-            x0, y0, x1, y1, trackID = td[0].item(), td[1].item(), td[2].item(), td[3].item(), td[4].item()
+            x0, y0, x1, y1, trackID = (
+                td[0].item(),
+                td[1].item(),
+                td[2].item(),
+                td[3].item(),
+                td[4].item()
+            )
             overlap = 0
             for ob in objs:
-                dx0, dy0, dx1, dy1 = (ob.bbox.xmin.item(), ob.bbox.ymin.item(),
-                                      ob.bbox.xmax.item(), ob.bbox.ymax.item())
+                dx0, dy0, dx1, dy1 = (
+                    ob.bbox.xmin.item(),
+                    ob.bbox.ymin.item(),
+                    ob.bbox.xmax.item(),
+                    ob.bbox.ymax.item()
+                )
                 area = (min(dx1, x1) - max(dx0, x0)) * (min(dy1, y1) - max(dy0, y0))
                 if area > overlap:
                     overlap = area
@@ -84,11 +98,13 @@ def generate_svg(src_size, inference_size, inference_box, objs, labels, text_lin
 
             # Relative coordinates.
             x, y, w, h = x0, y0, x1 - x0, y1 - y0
-            # Absolute coordinates, input tensor space.
+            # Convert to absolute coordinates in the inference (tensor) space.
             x, y, w, h = int(x * inf_w), int(y * inf_h), int(w * inf_w), int(h * inf_h)
-            # Subtract boxing offset.
+            # Subtract the boxing offset.
             x, y = x - box_x, y - box_y
-            # Scale to source coordinate space.
+            # Remove the crop offset so the overlay aligns with the visible area.
+            x, y = x - crop_left, y - crop_top
+            # Scale coordinates to the cropped display space.
             x, y, w, h = x * scale_x, y * scale_y, w * scale_x, h * scale_y
             percent = int(100 * obj.score)
             label = '{}% {} ID:{}'.format(percent, labels.get(obj.id, obj.id), int(trackID))
@@ -100,11 +116,13 @@ def generate_svg(src_size, inference_size, inference_box, objs, labels, text_lin
             x0, y0, x1, y1 = list(obj.bbox)
             # Relative coordinates.
             x, y, w, h = x0, y0, x1 - x0, y1 - y0
-            # Absolute coordinates, input tensor space.
+            # Convert to absolute coordinates in the inference space.
             x, y, w, h = int(x * inf_w), int(y * inf_h), int(w * inf_w), int(h * inf_h)
-            # Subtract boxing offset.
+            # Subtract the boxing offset.
             x, y = x - box_x, y - box_y
-            # Scale to source coordinate space.
+            # Remove the crop offset.
+            x, y = x - crop_left, y - crop_top
+            # Scale coordinates to the cropped display space.
             x, y, w, h = x * scale_x, y * scale_y, w * scale_x, h * scale_y
             percent = int(100 * obj.score)
             label = '{}% {}'.format(percent, labels.get(obj.id, obj.id))
@@ -116,8 +134,7 @@ def generate_svg(src_size, inference_size, inference_box, objs, labels, text_lin
 
 class BBox(collections.namedtuple('BBox', ['xmin', 'ymin', 'xmax', 'ymax'])):
     """Bounding box.
-    Represents a rectangle which sides are either vertical or horizontal, parallel
-    to the x or y axis.
+    Represents a rectangle whose sides are vertical or horizontal.
     """
     __slots__ = ()
 
@@ -133,10 +150,13 @@ def get_output(interpreter, score_threshold, top_k, image_scale=1.0):
         return Object(
             id=int(category_ids[i]),
             score=scores[i],
-            bbox=BBox(xmin=np.maximum(0.0, xmin),
-                      ymin=np.maximum(0.0, ymin),
-                      xmax=np.minimum(1.0, xmax),
-                      ymax=np.minimum(1.0, ymax)))
+            bbox=BBox(
+                xmin=np.maximum(0.0, xmin),
+                ymin=np.maximum(0.0, ymin),
+                xmax=np.minimum(1.0, xmax),
+                ymax=np.minimum(1.0, ymax)
+            )
+        )
     return [make(i) for i in range(top_k) if scores[i] >= score_threshold]
 
 
@@ -173,60 +193,30 @@ def main():
     interpreter.allocate_tensors()
     labels = load_labels(args.labels)
 
-    # Get the model's expected input size.
     w, h, _ = common.input_image_size(interpreter)
     inference_size = (w, h)
-    # Average fps over last 30 frames.
+    # Average FPS over last 30 frames.
     fps_counter = common.avg_fps_counter(30)
 
-    def user_callback(input_buffer, src_size, inference_box, mot_tracker):
+    def user_callback(input_tensor, src_size, inference_box, mot_tracker, crop_offsets):
         nonlocal fps_counter
         start_time = time.monotonic()
-
-        # Map the Gst.Buffer to obtain the raw image data.
-        result, mapinfo = input_buffer.map(common.Gst.MapFlags.READ)
-        if not result:
-            return
-        # Get the model's expected input shape (e.g. [1, H, W, C]).
-        input_details = interpreter.get_input_details()[0]
-        _, H, W, C = input_details['shape']
-
-        # Convert the mapped buffer into a NumPy array.
-        np_img = np.frombuffer(mapinfo.data, dtype=np.uint8)
-        np_img = np_img.reshape((H, W, C))
-        input_buffer.unmap(mapinfo)
-
-        # Use the inference_box (x, y, width, height) to crop the image.
-        box_x, box_y, box_w, box_h = map(int, inference_box)
-        # Ensure crop coordinates are within bounds.
-        box_x = max(0, box_x)
-        box_y = max(0, box_y)
-        box_w = min(W - box_x, box_w)
-        box_h = min(H - box_y, box_h)
-        cropped_img = np_img[box_y:box_y+box_h, box_x:box_x+box_w, :]
-
-        # Use Pillow to resize the cropped image to the model's input size.
-        pil_img = Image.fromarray(cropped_img)
-        resized_img = np.array(pil_img.resize((W, H), Image.BILINEAR))
-
-        # Copy the resized image into the interpreter's input tensor.
-        interpreter.tensor(input_details['index'])()[0][:, :] = resized_img
-
+        common.set_input(interpreter, input_tensor, args.zoom)
         interpreter.invoke()
         objs = get_output(interpreter, args.threshold, args.top_k)
         end_time = time.monotonic()
-
-        # Build detections for the tracker.
         detections = []
         for n in range(len(objs)):
-            element = [objs[n].bbox.xmin, objs[n].bbox.ymin,
-                       objs[n].bbox.xmax, objs[n].bbox.ymax,
-                       objs[n].score]
+            element = []
+            element.append(objs[n].bbox.xmin)
+            element.append(objs[n].bbox.ymin)
+            element.append(objs[n].bbox.xmax)
+            element.append(objs[n].bbox.ymax)
+            element.append(objs[n].score)
             detections.append(element)
         detections = np.array(detections)
         trdata = []
         trackerFlag = False
-        text_lines = []
         if detections.any():
             if mot_tracker is not None:
                 trdata = mot_tracker.update(detections)
@@ -236,10 +226,7 @@ def main():
                 'FPS: {} fps'.format(round(next(fps_counter))),
             ]
         if len(objs) != 0:
-            # Generate the SVG overlay.
-            # inference_size here is (W, H) of the model input,
-            # and inference_box (box_x, box_y, box_w, box_h) maps detection coordinates.
-            return generate_svg(src_size, (W, H), (box_x, box_y, box_w, box_h), objs, labels, text_lines, trdata, trackerFlag)
+            return generate_svg(src_size, inference_size, inference_box, objs, labels, text_lines, trdata, trackerFlag, crop_offsets)
 
     result = gstreamer.run_pipeline(user_callback,
                                     src_size=(1080, 960),
