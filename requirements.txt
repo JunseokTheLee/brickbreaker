@@ -3,3 +3,4 @@ numpy
 svgwrite
 tflite-runtime
 keyboard
+# pip install -r requirements.txt
