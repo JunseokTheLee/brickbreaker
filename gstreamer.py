@@ -194,69 +194,40 @@ class GstPipeline:
                         break
                     elif event.name.isdigit():
                         increment = int(event.name)
-                    elif event.name == 'up':
-                        if not ctrl_pressed:
-                            self.crop_bottom += increment
-                            crop_sum = self.crop_top + self.crop_bottom
-                            crop_sum = min(crop_sum, self.src_size[1] - 1)
-                            self.crop_bottom = max(0, crop_sum - self.crop_top)
-                            self.crop_bottom = min(self.crop_bottom, self.src_size[1] - 1)
-                            print("Crop bottom:", self.crop_bottom, end='\r')
-                        else:
-                            self.crop_top -= increment
-                            crop_sum = self.crop_top + self.crop_bottom
-                            crop_sum = min(crop_sum, self.src_size[1] - 1)
-                            self.crop_top = max(0, crop_sum - self.crop_bottom)
-                            self.crop_top = min(self.crop_top, self.src_size[1] - 1)
-                            print("Crop top:", self.crop_top, end='\r')                    
-                        self.update_videocrop()
                     elif event.name == 'down':
-                        if not ctrl_pressed:
-                            self.crop_top += increment
-                            crop_sum = self.crop_top + self.crop_bottom
-                            crop_sum = min(crop_sum, self.src_size[1] - 1)
-                            self.crop_top = max(0, crop_sum - self.crop_bottom)
-                            self.crop_top = min(self.crop_top, self.src_size[1] - 1)
-                            print("Crop top:", self.crop_top, end='\r')
-                        else:
-                            self.crop_bottom -= increment
-                            crop_sum = self.crop_top + self.crop_bottom
-                            crop_sum = min(crop_sum, self.src_size[1] - 1)
-                            self.crop_bottom = max(0, crop_sum - self.crop_top)
-                            self.crop_bottom = min(self.crop_bottom, self.src_size[1] - 1)
-                            print("Crop bottom:", self.crop_bottom, end='\r')
+                        self.crop_bottom += increment
+                        crop_sum = self.crop_top + self.crop_bottom
+                        crop_sum = min(crop_sum, self.src_size[1] - 1)
+                        self.crop_bottom = max(0, crop_sum - self.crop_top)
+                        self.crop_bottom = min(self.crop_bottom, self.src_size[1] - 1)
+                        print("Crop bottom:", self.crop_bottom, end='\r')
+                                      
+                        self.update_videocrop()
+                    elif event.name == 'up':
+                        self.crop_bottom -= increment
+                        crop_sum = self.crop_top + self.crop_bottom
+                        crop_sum = min(crop_sum, self.src_size[1] - 1)
+                        self.crop_bottom = max(0, crop_sum - self.crop_top)
+                        self.crop_bottom = min(self.crop_bottom, self.src_size[1] - 1)
+                        print("Crop bottom:", self.crop_bottom, end='\r')
+                        
                         self.update_videocrop()
                     elif event.name == 'left':
-                        if not ctrl_pressed:
-                            self.crop_right += increment
-                            crop_sum = self.crop_right + self.crop_left
-                            crop_sum = min(crop_sum, self.src_size[0] - 1)
-                            self.crop_right = max(0, crop_sum - self.crop_left)
-                            self.crop_right = min(self.crop_right, self.src_size[0] - 1)
-                            print("Crop right:", self.crop_right, end='\r')
-                        else:
-                            self.crop_left -= increment
-                            crop_sum = self.crop_left + self.crop_right
-                            crop_sum = min(crop_sum, self.src_size[0] - 1)
-                            self.crop_left = max(0, crop_sum - self.crop_right)
-                            self.crop_left = min(self.crop_left, self.src_size[0] - 1)
-                            print("Crop left:", self.crop_left, end='\r')
+                        self.crop_right += increment
+                        crop_sum = self.crop_right + self.crop_left
+                        crop_sum = min(crop_sum, self.src_size[0] - 1)
+                        self.crop_right = max(0, crop_sum - self.crop_left)
+                        self.crop_right = min(self.crop_right, self.src_size[0] - 1)
+                        print("Crop right:", self.crop_right, end='\r')
+                        
                         self.update_videocrop()
                     elif event.name == 'right':
-                        if not ctrl_pressed:
-                            self.crop_left += increment
-                            crop_sum = self.crop_left + self.crop_right
-                            crop_sum = min(crop_sum, self.src_size[0] - 1)
-                            self.crop_left = max(0, crop_sum - self.crop_right)
-                            self.crop_left = min(self.crop_left, self.src_size[0] - 1)
-                            print("Crop left:", self.crop_left, end='\r')
-                        else:
-                            self.crop_right -= increment
-                            crop_sum = self.crop_left + self.crop_right
-                            crop_sum = min(crop_sum, self.src_size[0] - 1)
-                            self.crop_right = max(0, crop_sum - self.crop_left)
-                            self.crop_right = min(self.crop_right, self.src_size[0] - 1)
-                            print("Crop right:", self.crop_right, end='\r')
+                        self.crop_right -= increment
+                        crop_sum = self.crop_left + self.crop_right
+                        crop_sum = min(crop_sum, self.src_size[0] - 1)
+                        self.crop_right = max(0, crop_sum - self.crop_left)
+                        self.crop_right = min(self.crop_right, self.src_size[0] - 1)
+                        print("Crop right:", self.crop_right, end='\r')
                         self.update_videocrop()
             except:
                 pass
